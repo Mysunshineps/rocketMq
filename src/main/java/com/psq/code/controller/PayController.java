@@ -1,7 +1,9 @@
 package com.psq.code.controller;
 
+import com.alibaba.fastjson.JSON;
 import com.psq.code.config.RocketMqConfig;
 import com.psq.code.jms.PayProducer;
+import com.psq.code.model.Order;
 import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.MessageQueueSelector;
@@ -12,6 +14,7 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.remoting.exception.RemotingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -32,13 +35,13 @@ public class PayController {
      * @param text
      * @return
      */
-    @RequestMapping("/api/v1/pay_cb")
-    public Object callback(String text) throws InterruptedException, RemotingException, MQClientException, MQBrokerException {
+    @RequestMapping("/api/v1/test")
+    public Object callbackV1(String text) throws InterruptedException, RemotingException, MQClientException, MQBrokerException {
 
         /**
          * 指定消息keys，是唯一的作为标识
          */
-        Message message = new Message(RocketMqConfig.TOPIC,"tagA", "17778386756", ("hello rocketmq = "+text).getBytes() );
+        Message message = new Message(RocketMqConfig.PAY_TOPIC,"tagA", "17778386756", text.getBytes());
 
         /**
          * 该参数setDelayTimeLevel(xxx)设置延迟消息：
@@ -60,10 +63,10 @@ public class PayController {
          */
         sendResult = payProducer.getProducer().send(message);
 
-        // /**
-        //  * todo:2.异常方式发送消息，有返回值，消息不丢失
-        //  * 应用场景：对时间敏感,可以支持更高的并发，回调成功触发相对应的业务，比如注册成功后通知积分系统发放优惠券
-        //  */
+        /**
+         * todo:2.异常方式发送消息，有返回值，消息不丢失
+         * 应用场景：对时间敏感,可以支持更高的并发，回调成功触发相对应的业务，比如注册成功后通知积分系统发放优惠券
+         */
         // payProducer.getProducer().send(message, new SendCallback() {
         //     //消息异步发送后消费成功返回
         //     @Override
@@ -78,75 +81,106 @@ public class PayController {
         //         //补偿机制，根据业务情况进行使用，看是否重试
         //     }
         // });
-        //
-        // /**
-        //  * todo:3.oneway方式发送消息，没有返回值，消息可能丢失
-        //  * 使用场景：主要是日志收集，适用于某些耗时非常短，但对可靠性要求并不高的场景, 也就是LogServer, 只负责发送消息，不等待服务器回应且没有回调函数触发，即只发送请求不等待应答
-        //  */
-        // payProducer.getProducer().sendOneway(message);
-        //
-        // /**
-        //  * todo:生产消息使用MessageQueueSelector投递到Topic下指定的queue
-        //  * 应用场景：顺序消息，分摊负载
-        //  * 注意：
-        //  * 1.支持同步，异步发送指定的MessageQueue
-        //  * 2.选择的queue数量(也就是下面的arg参数)必须小于配置的，否则会出错：越界报错
-        //  */
-        // //todo：1.同步方式的MessageQueueSelector投递
-        // sendResult = payProducer.getProducer().send(message, new MessageQueueSelector() {
-        //     @Override
-        //     public MessageQueue select(List<MessageQueue> mqs, Message msg, Object arg) {
-        //         //这里的arg就是send(message,new MessageQueueSelector(){}, arg)中第三个传入的参数
-        //         Integer queueNum = 0;
-        //         if (null != arg) {
-        //             Integer argNum = Integer.parseInt(arg.toString());
-        //             //判断参数是否在队列范围内
-        //             if (argNum > 0 && mqs.size() > argNum) {
-        //                 queueNum = argNum;
-        //             }
-        //         }
-        //         //mqs代表的是配置的队列集合，默认队列长度为4，指针从0，1，2，3开始，所以传入的参数不能大于3，否则会报越界异常
-        //         //消息投递到Topic下指定的queue
-        //         return mqs.get(queueNum);
-        //     }
-        // }, 0);
-        //
-        // //todo：2.异步方式的MessageQueueSelector投递，没有返回值
-        // payProducer.getProducer().send(message, new MessageQueueSelector() {
-        //     @Override
-        //     public MessageQueue select(List<MessageQueue> mqs, Message msg, Object arg) {
-        //         //这里的arg就是send(message,new MessageQueueSelector(){}, arg)中第三个传入的参数
-        //         Integer queueNum = 0;
-        //         if (null != arg) {
-        //             Integer argNum = Integer.parseInt(arg.toString());
-        //             //判断参数是否在队列范围内
-        //             if (argNum > 0 && mqs.size() > argNum) {
-        //                 queueNum = argNum;
-        //             }
-        //         }
-        //         //mqs代表的是配置的队列集合，默认队列长度为4，指针从0，1，2，3开始，所以传入的参数不能大于3，否则会报越界异常
-        //         //消息投递到Topic下指定的queue
-        //         return mqs.get(queueNum);
-        //     }
-        // }, 0, new SendCallback() {
-        //     @Override
-        //     public void onSuccess(SendResult sendResult) {
-        //         System.out.printf("返回结果状态=%s，msg=%s", sendResult.getSendStatus(), sendResult);
-        //     }
-        //
-        //     @Override
-        //     public void onException(Throwable e) {
-        //         System.out.printf("返回结果状态失败，异常信息=%s", e);
-        //         e.printStackTrace();
-        //         //补偿机制，根据业务情况进行使用，看是否重试
-        //     }
-        //
-        // });
 
+
+        /**
+         * todo:3.oneway方式发送消息，没有返回值，消息可能丢失
+         * 使用场景：主要是日志收集，适用于某些耗时非常短，但对可靠性要求并不高的场景, 也就是LogServer, 只负责发送消息，不等待服务器回应且没有回调函数触发，即只发送请求不等待应答
+         */
+        // payProducer.getProducer().sendOneway(message);
+
+        /**
+         * todo:生产消息使用MessageQueueSelector投递到Topic下指定的queue
+         * 应用场景：顺序消息，分摊负载
+         * 注意：
+         * 1.支持同步，异步发送指定的MessageQueue
+         * 2.选择的queue数量(也就是下面的arg参数)必须小于配置的，否则会出错：越界报错
+         */
+        //todo：1.同步方式的MessageQueueSelector投递
+
+        sendResult = payProducer.getProducer().send(message, new MessageQueueSelector() {
+            @Override
+            public MessageQueue select(List<MessageQueue> mqs, Message msg, Object arg) {
+                //这里的arg就是send(message,new MessageQueueSelector(){}, arg)中第三个传入的参数
+                Integer queueNum = 0;
+                if (null != arg) {
+                    Integer argNum = Integer.parseInt(arg.toString());
+                    //判断参数是否在队列范围内
+                    if (argNum > 0 && mqs.size() > argNum) {
+                        queueNum = argNum;
+                    }
+                }
+                //mqs代表的是配置的队列集合，默认队列长度为4，指针从0，1，2，3开始，所以传入的参数不能大于3，否则会报越界异常
+                //消息投递到Topic下指定的queue
+                return mqs.get(queueNum);
+            }
+        }, 0);
+
+        //todo：2.异步方式的MessageQueueSelector投递，没有返回值
+
+        payProducer.getProducer().send(message, new MessageQueueSelector() {
+            @Override
+            public MessageQueue select(List<MessageQueue> mqs, Message msg, Object arg) {
+                //这里的arg就是send(message,new MessageQueueSelector(){}, arg)中第三个传入的参数
+                Integer queueNum = 0;
+                if (null != arg) {
+                    Integer argNum = Integer.parseInt(arg.toString());
+                    //判断参数是否在队列范围内
+                    if (argNum > 0 && mqs.size() > argNum) {
+                        queueNum = argNum;
+                    }
+                }
+                //mqs代表的是配置的队列集合，默认队列长度为4，指针从0，1，2，3开始，所以传入的参数不能大于3，否则会报越界异常
+                //消息投递到Topic下指定的queue
+                return mqs.get(queueNum);
+            }
+        }, 0, new SendCallback() {
+            @Override
+            public void onSuccess(SendResult sendResult) {
+                System.out.printf("返回结果状态=%s，msg=%s", sendResult.getSendStatus(), sendResult);
+            }
+
+            @Override
+            public void onException(Throwable e) {
+                System.out.printf("返回结果状态失败，异常信息=%s", e);
+                e.printStackTrace();
+                //补偿机制，根据业务情况进行使用，看是否重试
+            }
+
+        });
 
         System.out.println(sendResult);
-
         return sendResult.toString();
     }
 
+    /**
+     * 消息顺序投递：同类消息投递到同一个话题同一个Queue队列
+     * 注意：
+     * 顺序消息暂不支持广播模式
+     * 顺序消息不支持异步发送方式，否则将无法严格保证顺序
+     * @return
+     */
+    @RequestMapping(value = "/api/v2/order",method = RequestMethod.GET)
+    public Object callbackV2(String tags) throws Exception{
+        //假数据
+        List<Order> orderList = Order.getOrderList();
+        for (Order order : orderList) {
+            Message message = new Message(RocketMqConfig.ORDER_TOPIC,tags, order.getOrderId().toString(), (order.toString()).getBytes());
+            SendResult sendResult = payProducer.getProducer().send(message, new MessageQueueSelector() {
+                @Override
+                public MessageQueue select(List<MessageQueue> list, Message message, Object o) {
+                    Long id = 0L;
+                    if (null != o) {
+                        id = (Long) o;
+                    }
+                    long num = id % list.size();
+                    return list.get((int) num);
+                }
+            }, order.getOrderId());
+
+            System.out.println("orderId："+ order.getOrderId() + "返回结果：" + JSON.toJSONString(sendResult));
+            order.setResult(JSON.toJSONString(sendResult));
+        }
+        return JSON.toJSONString(orderList);
+    }
 }

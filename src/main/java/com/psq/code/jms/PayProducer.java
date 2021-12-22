@@ -22,9 +22,9 @@ public class PayProducer {
         producer = new DefaultMQProducer(RocketMqConfig.PRODUCER_GROUP,true);
         /**
          * 指定NameServer地址，多个地址以 ; 隔开
-         * 如 producer.setNamesrvAddr("192.168.100.141:9876;192.168.100.142:9876;192.168.100.149:9876");
          */
         producer.setNamesrvAddr(RocketMqConfig.NAME_SERVER_ADDR);
+        producer.setVipChannelEnabled(false);
 
         /**
          * 同步投递时，生产者投递到broker失败时的重试次数，默认为2次，可配置setRetryTimesWhenSendFailed参数设定指定的重试次数

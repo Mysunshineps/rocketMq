@@ -28,15 +28,20 @@ public class PayConsumer {
          */
         consumer = new DefaultMQPushConsumer(RocketMqConfig.CONSUMER_GROUP,true);
         consumer.setNamesrvAddr(RocketMqConfig.NAME_SERVER_ADDR);
-        consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_LAST_OFFSET);
-        consumer.subscribe(RocketMqConfig.TOPIC, "*");
+        //CONSUME_FROM_LAST_OFFSET:默认策略，初次从该队列最尾开始消费，即跳过历史消息，后续再启动接着上次消费的进度开始消费
+        //CONSUME_FROM_FIRST_OFFSET:初次从消息队列头部开始消费，即历史消息（还储存在broker的）全部消费一遍，后续再启动接着上次消费的进度开始消费
+        consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET);
+        consumer.subscribe(RocketMqConfig.PAY_TOPIC, "*");
         //消费模式，默认为CLUSTERING集群方式，也可指定为BROADCASTING广播模式，
         //但消费重试只针对集群消费方式生效；广播方式不提供失败重试特性，
         //即消费失败后，失败消息不再重试，继续消费新的消息
 //        consumer.setMessageModel(MessageModel.BROADCASTING);
+        //最大的重试次数：0-16次，如果超过设置的最大重试次数，该消息会被指向一个等待删除的队列中
+        // consumer.setMaxReconsumeTimes(3);
 
         //TODO 一条消息无论被重试几次，其中Message ID 和keys是不变的
         //TODO 消费 记得在消费逻辑里去重，可以将对应的信息加入数据库，以Message ID 和keys为唯一标识
+        //MessageListenerConcurrentl：这里可以并发的消费
         consumer.registerMessageListener(new MessageListenerConcurrently() {
             @Override
             public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> msgs, ConsumeConcurrentlyContext context) {
@@ -58,7 +63,7 @@ public class PayConsumer {
 //                        throw new Exception();
 //                    }
                     System.out.println("topic=" + topic + ", tags=" + tags + ", keys=" + keys + ", msg=" + body);
-
+                    //业务逻辑处理，处理成功后记录消息在数据库，消息去重
                     //表示消费成功，会删除队列的消息
                     return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
                 } catch (Exception e) {
@@ -77,7 +82,7 @@ public class PayConsumer {
             }
         });
         consumer.start();
-        System.out.println("consumer start ...");
+        System.out.println("PayConsumer start ...");
     }
 
 }
